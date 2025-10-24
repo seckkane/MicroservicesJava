@@ -1,0 +1,6 @@
+# Ignorer les fichiers MySQL
+data/
+*.sock
+*.cnf
+*.pid
+*.log

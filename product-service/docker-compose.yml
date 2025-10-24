@@ -1,0 +1,30 @@
+version: '4'
+services:
+  # --- Base de données MongoDB ---
+  mongodb:
+    image: mongo:7.0.5
+    container_name: mongodb
+    ports:
+      - "27017:27017"                     # Port MongoDB (accès local et depuis ton app)
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root     # Nom d’utilisateur admin
+      MONGO_INITDB_ROOT_PASSWORD: password # Mot de passe
+      MONGO_INITDB_DATABASE: product-service
+    volumes:
+      - ./data/mongodb:/data/db            # Sauvegarde locale des données
+
+  # --- Interface Web Mongo Express ---
+  mongo-express:
+    image: mongo-express:1.0.2-20
+    container_name: mongo-express
+    ports:
+      - "8081:8081"                       # Accessible sur http://localhost:8081
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+      ME_CONFIG_BASICAUTH_USERNAME: admin # Login pour accéder à Mongo Express
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    depends_on:
+      - mongodb                           # Démarre après MongoDB
