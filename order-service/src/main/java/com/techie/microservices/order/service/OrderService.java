@@ -7,6 +7,8 @@ import com.techie.microservices.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.UUID;
 
 @Service
@@ -17,6 +19,8 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final InventoryClient inventoryClient;
 
+    @Transactional //
+    // Pour que la sauvegarde soit atomique.
     public void placeOrder(OrderRequest orderRequest) {
 
         var isProductInStock = inventoryClient.isInstock(orderRequest.skuCode(), orderRequest.quantity());
@@ -37,7 +41,7 @@ public class OrderService {
             throw new ProductOutOfStockException(orderRequest.skuCode(), orderRequest.quantity());
             //log.warn("Produit '{}' indisponible pour cette quantité : {}", orderRequest.skuCode(), orderRequest.quantity());
         }
-
-
     }
+
+
 }

@@ -1,0 +1,6 @@
+Product service : 8080
+Order Service : 8082
+Inventory Service : 8086
+Keycloak : 8083
+Api gateway : 8090
+Mongodb Web : 8081

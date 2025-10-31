@@ -7,38 +7,44 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.containers.MySQLContainer;
 import io.restassured.RestAssured;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+
+
 
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class OrderServiceApplicationTests {
 
     @Autowired
-    private OrderRepository orderRepository;
+    private OrderRepository orderRepository; //Pour interagir avec la bdd
 
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private JdbcTemplate jdbcTemplate; // pour executer une requete sql directement
 
-    @ServiceConnection
+    @ServiceConnection //fait le lien automatique entre ton conteneur Testcontainers et la configuration
     static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0.33")
             .withDatabaseName("order_service_test")
             .withUsername("testuser")
             .withPassword("testpass")
             .withReuse(true); // ⚡ permet de réutiliser le conteneur
 
-    @LocalServerPort
+    //C’est utilisé avec @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+    @LocalServerPort //permet d’injecter automatiquement le port HTTP sur lequel ton application s’exécute pendant le test.
     private int port;
 
-    @BeforeEach
+    @BeforeEach // Cette méthode est exécutée avant chaque test.
     void setup() {
         RestAssured.baseURI = "http://localhost";
         RestAssured.port = port;
+        //orderRepository.deleteAll();
         jdbcTemplate.execute("DELETE FROM t_orders");
     }
 

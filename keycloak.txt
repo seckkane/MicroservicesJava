@@ -1,0 +1,317 @@
+About KEYCLOAK
+Keycloak permet à tes applications de ne plus gérer elles-mêmes les utilisateurs, les mots de passe et les rôles, mais de déléguer tout ça à un serveur central.
+| Fonctionnalité                                  | Description                                                                         |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **Single Sign-On (SSO)**                        | Un utilisateur se connecte une seule fois et accède à toutes les applis autorisées. |
+| **OpenID Connect / OAuth2 / SAML 2.0**          | Protocoles standards pour la gestion des tokens et sessions.                        |
+| **Gestion des utilisateurs**                    | Création, suppression, rôles, groupes, etc.                                         |
+| **Intégration LDAP / Active Directory**         | Connexion à des répertoires externes d’utilisateurs.                                |
+| **Authentification à plusieurs facteurs (MFA)** | Sécurité renforcée via OTP, SMS, ou applis d’authentification.                      |
+| **Clients et rôles**                            | Gère les applications (clients) et leurs permissions.                               |
+| **Admin Console & Account Console**             | Deux interfaces web : une pour les admins, une pour les utilisateurs.               |
+
+Les differents concepts
+| Concept                     | Rôle                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------- |
+| **Realm**                   | Un espace d’authentification indépendant (par ex. “my-company”).                      |
+| **Client**                  | Une application qui demande une authentification à Keycloak (ex : `gateway-service`). |
+| **User**                    | Un compte utilisateur géré par Keycloak.                                              |
+| **Role**                    | Une permission ou profil (ex : `admin`, `user`).                                      |
+| **Token**                   | Jeton JWT envoyé aux applis après authentification.                                   |
+| **Identity Provider (IdP)** | Fournisseur d’identité externe (Google, Facebook, etc.).                              |
+
+Les types de clients
+| Client           | Type           | Description                                                                        | Exemple                                             |
+| ---------------- | -------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **Angular App**  | `public`       | Front-end, ne peut pas stocker de secret                                           | Utilisateur se connecte ici avec login/mot de passe |
+| **API Gateway**  | `confidential` | Peut stocker un *client secret*                                                    | Vérifie les tokens JWT envoyés par le front         |
+| **Microservice** | `bearer-only`  | Ne fait pas de login, mais **accepte seulement** les requêtes avec un token valide | Exemple : `product-service`, `order-service`        |
+
+Les utilisateurs = “personnes” de ton système
+Oui — quand on parle de users, on parle :
+des comptes du personnel (admins, employés),
+des utilisateurs finaux de ton application,
+parfois même des applications elles-mêmes (via service accounts).
+Ils ne correspondent pas à des comptes de base de données,
+mais à des identités au niveau métier (personnes, systèmes, services).
+
+Les PROTOCOLES : OpenID Connect, OAuth2, SAML
+| Protocole                 | Sert à                                                                           | Utilisation                             |
+| ------------------------- | -------------------------------------------------------------------------------- | --------------------------------------- |
+| **OAuth 2.0**             | Autoriser une app à accéder à une ressource au nom d’un utilisateur              | Base du “Bearer Token”                  |
+| **OpenID Connect (OIDC)** | Extension de OAuth2 pour l’**authentification** (savoir *qui est l’utilisateur*) | Utilisé entre Angular et Keycloak       |
+| **SAML 2.0**              | Ancien protocole XML pour SSO (souvent entreprises)                              | Encore utilisé dans les systèmes legacy |
+
+Recap Login -> to access API
+| Étape | Composant    | Action                                               |
+| ----- | ------------ | ---------------------------------------------------- |
+| 1     | Angular      | Redirige vers Keycloak pour login                    |
+| 2     | Keycloak     | Authentifie Moussa (vérifie login + mot de passe)    |
+| 3     | Keycloak     | Génère un Access Token (JWT)                         |
+| 4     | Angular      | Stocke temporairement le token                       |
+| 5     | Gateway      | Reçoit le token → le valide                          |
+| 6     | Microservice | Reçoit la requête → valide aussi le token            |
+| 7     | Réponse      | Le service répond si le token est valide et autorisé |
+
+
+Exemple de configuration Keycloak
+Client 1 : Angular App (public)
+| Paramètre                  | Valeur                           |
+| -------------------------- | -------------------------------- |
+| **Client ID**              | `angular-app`                    |
+| **Access Type**            | `public`                         |
+| **Root URL**               | `http://localhost:4200/`         |
+| **Redirect URIs**          | `http://localhost:4200/*`        |
+| **Web Origins**            | `*` (ou `http://localhost:4200`) |
+| **Valid Post Logout URIs** | `http://localhost:4200/`         |
+Angular se connecte directement à Keycloak, sans secret.
+
+Client 2 : API Gateway (confidential)
+| Paramètre                | Valeur                                   |
+| ------------------------ | ---------------------------------------- |
+| **Client ID**            | `gateway-service`                        |
+| **Access Type**          | `confidential`                           |
+| **Root URL**             | `http://localhost:8080/`                 |
+| **Credentials → Secret** | `xxxxx-secret-key` (généré par Keycloak) |
+
+Les types d'utilisateur 
+Utilisateur humain (standard user)
+Un utilisateur réel : client, employé, membre d’une organisation…
+Exemples :
+moussa.diop → utilisateur normal de ton application.
+admin.app → administrateur métier.
+client.entreprise → compte client B2B.
+✅ Ces comptes peuvent :
+se connecter via la page de login,
+recevoir un token,
+avoir des rôles (ROLE_USER, ROLE_ADMIN, etc.).
+
+Service Account (utilisateur machine)
+Représente une application backend (ou script) qui s’authentifie sans interface utilisateur.
+Chaque client confidentiel peut avoir son propre service account activé.
+Exemple :
+Le client gateway-service peut avoir :
+Service account user: service-account-gateway-service
+Ce compte peut :
+appeler d’autres APIs internes,
+obtenir un token via client credentials flow,
+avoir des rôles techniques (ROLE_SYSTEM, ROLE_INTEGRATION…).
+
+Utilisateur fédéré
+Utilisateur qui vient d’une source externe (LDAP, Google, Azure AD…).
+Exemple :
+moussa.diop@entreprise.com connecté via Active Directory.
+user@gmail.com connecté via Google OAuth.
+➡️ Keycloak n’a pas le mot de passe localement,
+il délègue la vérification à la source externe.
+
+Administrateur Keycloak
+Utilisateur ayant accès à la console d’administration de Keycloak.
+Peut créer des realms, des clients, des rôles, etc.
+Peut aussi être un utilisateur dans un realm spécial : master.
+
+Recap
+| Élément                        | Angular (public)            | Gateway (confidential) | Microservice (bearer-only)      |
+| ------------------------------ | --------------------------- | ---------------------- | ------------------------------- |
+| **Enregistré dans Keycloak ?** | ✅ Oui                       | ✅ Oui                  | ✅ Oui                           |
+| **Stocke un secret ?**         | ❌ Non                       | ✅ Oui                  | ❌ Non                           |
+| **Fait un login ?**            | ✅ Oui (via OIDC)            | ❌ Non                  | ❌ Non                           |
+| **Vérifie le token ?**         | ❌ Non                       | ✅ Oui                  | ✅ Oui                           |
+| **Représente ?**               | Frontend                    | API sécurisée          | Service interne                 |
+| **Utilisateur associé ?**      | User réel (ex: moussa.diop) | Service Account        | Aucun (reçoit token du Gateway) |
+
+Gateway (client confidentiel) demande un token :
+POST /realms/{realm}/protocol/openid-connect/token
+grant_type=client_credentials
+client_id=gateway-service
+client_secret=xxxxx
+
+Remarque : OAuth2 ne dit pas qui est l’utilisateur (c’est pour l’autorisation). Pour l’authentification, on ajoute OIDC.
+
+Endpoints utiles Keycloak (OIDC)
+Authorization: /realms/{realm}/protocol/openid-connect/auth
+Token: /realms/{realm}/protocol/openid-connect/token
+Introspection: /realms/{realm}/protocol/openid-connect/token/introspect
+UserInfo: /realms/{realm}/protocol/openid-connect/userinfo
+JWKS (certs): /realms/{realm}/protocol/openid-connect/certs
+
+Qui définit les applications qui participent au SSO ?
+C’est le realm dans Keycloak qui définit toutes les applications clientes qui participent à l’écosystème de confiance (realm = domaine d’identité commun).
+👉 Qu’est-ce qu’un realm concrètement :
+
+C’est une “frontière de sécurité” dans Keycloak.
+Tout ce qui est à l’intérieur partage :
+la même base d’utilisateurs,
+les mêmes rôles et policies,
+les mêmes clés de signature JWT,
+et surtout la même session SSO.
+🧠 Donc → le SSO ne marche qu’à l’intérieur d’un même realm.
+Si tu as plusieurs realms, chacun a ses propres sessions et cookies de login.
+
+Exemple concret
+
+Imaginons un realm : mycompany.
+Il contient plusieurs clients enregistrés :
+| Nom du client     | Type                        | Description           | SSO partagé ? |
+| ----------------- | --------------------------- | --------------------- | ------------- |
+| `angular-app`     | Public (OIDC)               | ton front web Angular | ✅ Oui         |
+| `gateway-service` | Confidential (OIDC)         | ton API gateway       | ✅ Oui         |
+| `product-service` | Bearer-only (OIDC)          | microservice produit  | ✅ Oui         |
+| `admin-portal`    | Confidential (SAML ou OIDC) | app back-office       | ✅ Oui         |
+
+Ces quatre “clients” appartiennent au même realm mycompany, donc :
+si l’utilisateur se connecte sur angular-app, il obtient une session Keycloak valable aussi pour admin-portal (s’il va sur son URL, il sera directement reconnu).
+💡 SSO = cookies de session Keycloak + realm commun + clients enregistrés.
+
+Recap Fin 
+| Élément           | Définition / rôle                                                  | Exemple                                      |
+| ----------------- | ------------------------------------------------------------------ | -------------------------------------------- |
+| **Realm**         | Domaine d’identité, base de confiance commune                      | `mycompany`                                  |
+| **Client**        | Application qui utilise Keycloak (public/confidential/bearer-only) | Angular, Gateway, microservice               |
+| **SSO**           | Session partagée Keycloak dans un realm                            | login unique pour Angular + Admin Portal     |
+| **Secret client** | Mot de passe pour authentifier un client confidentiel              | Gateway stocke son secret dans vault/env var |
+| **Bearer-only**   | Client qui ne fait que valider tokens                              | microservice produit                         |
+| **Public**        | Client sans secret (navigateur/mobile)                             | Angular app                                  |
+
+
+Exemple 
+ 
+POST http://localhost:8083/realms/spring-microservices-securityshop-realm/protocol/openid-connect/token
+Network
+addresses: {…}
+local: {…}
+remote: {…}
+Request Headers
+Content-Type: application/x-www-form-urlencoded
+User-Agent: PostmanRuntime/7.49.0
+Accept: */*
+Cache-Control: no-cache
+Postman-Token: 418ff08c-7845-49f9-9a6f-ca4269424443
+Host: localhost:8083
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 115
+Cookie: JSESSIONID=470B90ABB2F36D19EB1F42B00CAAA608
+Request Body
+grant_type: "client_credentials"
+client_id: "spring-client-credentials-id"
+client_secret: "KLHaJPSij3uf6UVn66cH3MlSPmxRJPNY"
+Response Headers
+Cache-Control: no-store
+Pragma: no-cache
+content-length: 1562
+Content-Type: application/json
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Response Body
+{"access_token":"eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJMdURNSTNYSFNCaE9yT2VEZXpiT3dVS21DMTZCVHFBYW1ocENIZWk3NXN3In0.eyJleHAiOjE3NjE5MjQ4MjYsImlhdCI6MTc2MTkyNDUyNiwianRpIjoiNTJjNTNmYTEtOTVmOC00NTQwLTk3NjQtMDM3NDE3ZjE0OGQ4IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgzL3JlYWxtcy9zcHJpbmctbWljcm9zZXJ2aWNlcy1zZWN1cml0eXNob3AtcmVhbG0iLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiNDM3MzBmZjgtYWYwOC00OGIzLTgxNTYtYTBhMDU2ZTNhY2VlIiwidHlwIjoiQmVhcmVyIiwiYXpwIjoic3ByaW5nLWNsaWVudC1jcmVkZW50aWFscy1pZCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbImRlZmF1bHQtcm9sZXMtc3ByaW5nLW1pY3Jvc2VydmljZXMtc2VjdXJpdHlzaG9wLXJlYWxtIiwib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoiZW1haWwgcHJvZmlsZSIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwiY2xpZW50SG9zdCI6IjE3Mi4yMi4wLjEiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJzZXJ2aWNlLWFjY291bnQtc3ByaW5nLWNsaWVudC1jcmVkZW50aWFscy1pZCIsImNsaWVudEFkZHJlc3MiOiIxNzIuMjIuMC4xIiwiY2xpZW50X2lkIjoic3ByaW5nLWNsaWVudC1jcmVkZW50aWFscy1pZCJ9.vQG3OSSopG3JudzvD_-YD1p1z4Mx0QRjBe435I2AazT7_Note-TQn2TMT-7J3mMgZaP6Qs4kg3R5C0I-ZCDPEt5_vvW5xxMMuc5o3dOPMugP0nvlH613htztVox-AXbu3jMsliNRYFbDhr9XyfJoTR5QzLG9K5QF6f2ykXYGhahCVrzfnN0WaSwgROnFzOpDhUoQTgRhzln812oyXetqiuq4FlwzpWUMveZG3dMpKGjRFgFo3FdcdAqbh0JSoHAWxy-oa6pFDcQ9gS_IryzSil7dhFZ-nPIGeYNdW_H6CJURZFb-RACQalu24jQGk3ju1ZTaNo795RUesHI9Yn6t1g","expires_in":299,"refresh_expires_in":0,"token_type":"Bearer","not-before-policy":0,"scope":"email profile"}
+ 
+GET http://localhost:8090/api/product
+200
+549 ms
+Network
+Request Headers
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJMdURNSTNYSFNCaE9yT2VEZXpiT3dVS21DMTZCVHFBYW1ocENIZWk3NXN3In0.eyJleHAiOjE3NjE5MjQ4MjYsImlhdCI6MTc2MTkyNDUyNiwianRpIjoiNTJjNTNmYTEtOTVmOC00NTQwLTk3NjQtMDM3NDE3ZjE0OGQ4IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgzL3JlYWxtcy9zcHJpbmctbWljcm9zZXJ2aWNlcy1zZWN1cml0eXNob3AtcmVhbG0iLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiNDM3MzBmZjgtYWYwOC00OGIzLTgxNTYtYTBhMDU2ZTNhY2VlIiwidHlwIjoiQmVhcmVyIiwiYXpwIjoic3ByaW5nLWNsaWVudC1jcmVkZW50aWFscy1pZCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbImRlZmF1bHQtcm9sZXMtc3ByaW5nLW1pY3Jvc2VydmljZXMtc2VjdXJpdHlzaG9wLXJlYWxtIiwib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoiZW1haWwgcHJvZmlsZSIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwiY2xpZW50SG9zdCI6IjE3Mi4yMi4wLjEiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJzZXJ2aWNlLWFjY291bnQtc3ByaW5nLWNsaWVudC1jcmVkZW50aWFscy1pZCIsImNsaWVudEFkZHJlc3MiOiIxNzIuMjIuMC4xIiwiY2xpZW50X2lkIjoic3ByaW5nLWNsaWVudC1jcmVkZW50aWFscy1pZCJ9.vQG3OSSopG3JudzvD_-YD1p1z4Mx0QRjBe435I2AazT7_Note-TQn2TMT-7J3mMgZaP6Qs4kg3R5C0I-ZCDPEt5_vvW5xxMMuc5o3dOPMugP0nvlH613htztVox-AXbu3jMsliNRYFbDhr9XyfJoTR5QzLG9K5QF6f2ykXYGhahCVrzfnN0WaSwgROnFzOpDhUoQTgRhzln812oyXetqiuq4FlwzpWUMveZG3dMpKGjRFgFo3FdcdAqbh0JSoHAWxy-oa6pFDcQ9gS_IryzSil7dhFZ-nPIGeYNdW_H6CJURZFb-RACQalu24jQGk3ju1ZTaNo795RUesHI9Yn6t1g
+User-Agent: PostmanRuntime/7.49.0
+Accept: */*
+Postman-Token: 6037fd1d-a3f2-4fe3-ba0b-5b0255b1a079
+Host: localhost:8090
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Cookie: JSESSIONID=470B90ABB2F36D19EB1F42B00CAAA608
+Response Headers
+date: Fri, 31 Oct 2025 15:28:59 GMT
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+Pragma: no-cache
+Expires: 0
+X-Frame-Options: DENY
+Content-Type: application/json
+Transfer-Encoding: chunked
+Keep-Alive: timeout=60
+Connection: keep-alive
+Response Body
+[{"id":"68daa7afa11850cd1c41bc57","name":"Laptop Gamer","description":"Ordinateur portable puissant pour gaming","skuCode":"SKU-LAP123","price":1500.00},{"id":"68daa80aa11850cd1c41bc58","name":"Smartphone Ultra","description":"Smartphone Android haut de gamme avec écran AMOLED","skuCode":"SKU-PHN456","price":900.00},{"id":"68daa815a11850cd1c41bc59","name":"Casque Audio","description":"Casque Bluetooth avec réduction de bruit active","skuCode":"SKU-HDP789","price":200.00},{"id":"68dbe9eca11850cd1c41bc5a","name":"Casque Ordi","description":"Casque Bluetooth avec réduction de bruit active","skuCode":"SKU-HDP789","price":200.00},{"id":"68dd3e22b370ff6daa14f4e1","name":"Smartphone Ultra","description":"Smartphone Iphone haut de gamme avec écran AMOLED","skuCode":"SKU-PHN459","price":900.00},{"id":"68f631970d63a85a7cf20ca6","name":"HP Elite one","description":"All in One Computer with performants CPU","skuCode":"SKU-HPE459","price":1200.00},{"id":"68ff5320ac38364aca18b2fc","name":"HP Elite book","description":"All in One Computer with performants CPU","skuCode":"SKU-HPE555","price":1400.00}]
+
+
+Requête POST pour obtenir le token
+URL : POST http://localhost:8083/realms/spring-microservices-securityshop-realm/protocol/openid-connect/token
+
+Headers importants
+Content-Type: application/x-www-form-urlencoded → Keycloak attend les paramètres sous forme grant_type=...&client_id=...&client_secret=....
+Authorization n’est pas présent ici, car tu utilises client_credentials (client secret dans le body).
+Postman-Token et Cookie → internes à Postman et la session HTTP, pas critiques pour le token.
+
+Body
+grant_type=client_credentials
+client_id=spring-client-credentials-id
+client_secret=KLHaJPSij3uf6UVn66cH3MlSPmxRJPNY
+
+grant_type=client_credentials → tu demandes un token pour le client, pas pour un utilisateur particulier.
+client_id et client_secret → identifient le client dans Keycloak.
+Pas besoin d’utilisateur/mot de passe avec client_credentials.
+
+Reponse 
+{
+  "access_token":"eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUI...",
+  "expires_in":299,
+  "refresh_expires_in":0,
+  "token_type":"Bearer",
+  "scope":"email profile"
+}
+
+access_token → le JWT que tu vas utiliser pour accéder à ton microservice.
+expires_in → durée de validité du token en secondes (~5 min ici).
+token_type → toujours “Bearer” pour OAuth2.
+scope → les permissions demandées par le client (ici email profile).
+
+Point clé : même sans MySQL, Keycloak génère un token valide car tout est en mémoire (dev-file).
+
+Requête GET vers ton microservice
+URL : GET http://localhost:8090/api/product
+
+Headers
+Authorization: Bearer <token> → ici, tu passes le JWT récupéré précédemment.
+Accept: */*, User-Agent → info classique HTTP.
+
+Réponse
+[
+  {"id":"68daa7afa11850cd1c41bc57","name":"Laptop Gamer","price":1500.00,...},
+  {"id":"68daa80aa11850cd1c41bc58","name":"Smartphone Ultra","price":900.00,...},
+  ...
+]
+
+Ton microservice Spring Boot a accepté le token JWT.
+Spring Security (ou le filtre JWT) a validé :
+Le token est bien formé,
+Il provient du bon issuer (ton Keycloak),
+Il n’est pas expiré.
+Résultat : 200 OK avec la liste des produits.
+
+ 
+POST http://localhost:8083/realms/spring-microservices-securityshop-realm/protocol/openid-connect/token
+200
+29 ms
+Network
+Request Headers
+Request Body
+Response Headers
+Response Body
+ 
+GET http://localhost:8090/api/product
+Network
+Request Headers
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJMdURNSTNYSFNCaE9yT2VEZXpiT3dVS21DMTZCVHFBYW1ocENIZWk3NXN3In0.eyJleHAiOjE3NjE5MjYxOTEsImlhdCI6MTc2MTkyNTg5MSwianRpIjoiNDU3MGY0MGQtMzA4OS00YzY3LTkyYzctMjQ1OTJkNDIxNDIxIiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgzL3JlYWxtcy9zcHJpbmctbWljcm9zZXJ2aWNlcy1zZWN1cml0eXNob3AtcmVhbG0iLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiNDM3MzBmZjgtYWYwOC00OGIzLTgxNTYtYTBhMDU2ZTNhY2VlIiwidHlwIjoiQmVhcmVyIiwiYXpwIjoic3ByaW5nLWNsaWVudC1jcmVkZW50aWFscy1pZCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbImRlZmF1bHQtcm9sZXMtc3ByaW5nLW1pY3Jvc2VydmljZXMtc2VjdXJpdHlzaG9wLXJlYWxtIiwib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoiZW1haWwgcHJvZmlsZSIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwiY2xpZW50SG9zdCI6IjE3Mi4yMi4wLjEiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJzZXJ2aWNlLWFjY291bnQtc3ByaW5nLWNsaWVudC1jcmVkZW50aWFscy1pZCIsImNsaWVudEFkZHJlc3MiOiIxNzIuMjIuMC4xIiwiY2xpZW50X2lkIjoic3ByaW5nLWNsaWVudC1jcmVkZW50aWFscy1pZCJ9.mCu6eeU6GAn1XJ2igrwd_L1ocYsKuFnp5V9Qxn79TuKARtwAht8pRiS9FtNiK11t0SxL6ffYLFurTsc3XkNzZu_-o9T6QZuC5DOWOyGP7zCEzLppOfJ3nbdOoD8YfJLAZBJzXSOA-ZT2HY7rec_xhLNliKnZgIzRw_oThdMZuDslL5naiddUpoJpzLihaIPLT0kzZJsjS37FhI5wjFew7lvinHA6hGotVBt-LTlF93cNObDP4i0KvRm3KZAte_lmv7ZCxvba75gv1rozRKbjJKsEoe8M-g9mj1JeYnoGa9IqwZ7tclM-uXBc5oY6xw1ZW4_Z9pj6VDky5JHfpYnKHw
+User-Agent: PostmanRuntime/7.49.0
+Accept: */*
+Postman-Token: b8cb2455-17b5-44d8-a6f7-3ac07db719bb
+Host: localhost:8090
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Cookie: JSESSIONID=470B90ABB2F36D19EB1F42B00CAAA608
+Response Headers
+Response Body
