@@ -1,3 +1,5 @@
+name:
+  Microservices Tuto
 version: '4'
 services:
   # --- Base de données MongoDB ---

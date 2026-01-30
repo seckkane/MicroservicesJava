@@ -1,9 +1,15 @@
+
 package com.techie.microservices.inventory.service;
 
+import com.techie.microservices.inventory.exception.ProductNotFoundException;
+import com.techie.microservices.inventory.exception.ProductOutOfStockException;
+import com.techie.microservices.inventory.model.Inventory;
 import com.techie.microservices.inventory.repository.InventoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -13,10 +19,22 @@ public class InventoryService {
     private final InventoryRepository inventoryRepository;
 
     public boolean isInStock(String skuCode, Integer quantity) {
-        // Find an inventory for given skuCode where quantity >= 0
-        boolean isInStock = inventoryRepository.existsBySkuCodeAndQuantityIsGreaterThanEqual(skuCode, quantity);
+        log.info("Checking stock for product {} and quantity {}", skuCode, quantity);
 
-        log.info("  --> Received request to check stock for skuCode {}, with quantity {} : {}", skuCode, quantity, isInStock);
-        return isInStock;
+        Inventory inventory = inventoryRepository.findBySkuCode(skuCode)
+                .orElseGet(() -> {
+                    log.warn("❌ Product unavalaible with code : {}", skuCode);
+                    throw new ProductNotFoundException(skuCode);
+                });
+
+
+        // 2️⃣ Check if enough stock is available
+        if (inventory.getQuantity() < quantity) {
+            log.info("❌ Product '{}' unavailable with stock '{}'", skuCode, inventory.getQuantity());
+            throw new ProductOutOfStockException(skuCode, quantity, inventory.getQuantity());
+        }
+
+        log.info("✅ Product {} is in stock for requested quantity {}", skuCode, quantity);
+        return true;
     }
 }

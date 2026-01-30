@@ -17,11 +17,12 @@ public class SecurityConfig {
 
     @Bean //Elle ne fait pas partie du contexte Spring. Donc a configuration de sécurité ne serait pas appliquée.
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
-        return httpSecurity.authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated()) // Toutes les requêtes HTTP doivent être authentifiées.
-                        //.requestMatchers(freeResourceUrls).permitAll() // Alors certaines URLs auraient été libres d’accès (pas besoin d’être connecté
-                        .oauth2ResourceServer(auth -> auth.jwt(Customizer.withDefaults()))
-                        //c’est-à-dire qu’elle protège des ressources et valide les tokens JWT
-                        //.cors(cors -> cors.configurationSource(corsConfigurationSource()) //autoriser des appels d’un frontend React/Vue
+
+        return httpSecurity.authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(freeResourceUrls).permitAll() // Alors certaines URLs auraient été libres d’accès (pas besoin d’être connecté
+                        .anyRequest().authenticated()) // Toutes les requêtes HTTP doivent être authentifiées.
+                        //.cors(cors -> cors.configurationSource(corsConfigurationSource())) //autoriser des appels d’un frontend React/Vue
+                        .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults())) //c’est-à-dire qu’elle protège des ressources et valide les tokens JWT
                         .build();
 
                         //Spring Security va :
